@@ -160,14 +160,13 @@
         import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, where, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-
         const firebaseConfig = {
-            apiKey: "AIzaSyAVS_Gkv8IORwVDDuKdLGs51ZW6rl5C38Y",
-            authDomain: "it-vault-app-9cb13.firebaseapp.com",
-            projectId: "it-vault-app-9cb13",
-            storageBucket: "it-vault-app-9cb13.firebasestorage.app",
-            messagingSenderId: "19647717282",
-            appId: "1:19647717282:web:c77f9f5aa811c1ffd01cfb"
+            apiKey: "AIzaSy...",          // <--- ใส่ API Key ของคุณ
+            authDomain: "project-id.firebaseapp.com", // <--- ใส่ Auth Domain
+            projectId: "project-id",      // <--- ใส่ Project ID
+            storageBucket: "project-id.appspot.com",
+            messagingSenderId: "...",
+            appId: "..."
         };
 
         // Initialize Firebase
@@ -391,66 +390,4 @@
                         <span style="background:#e2e8f0; padding:2px 8px; border-radius:4px; font-size:12px;">${item.category}</span>
                     </div>
                     
-                    ${item.url ? `<div class="credential-value"><input value="${item.url}" readonly> <button class="btn btn-secondary" onclick="window.open('${item.url}')">🔗</button></div>` : ''}
-                    
-                    <div class="credential-value">
-                        <input value="${item.username}" readonly placeholder="Username">
-                        <button class="btn btn-secondary" onclick="copyText('${item.username}')">Copy</button>
-                    </div>
-                    
-                    <div class="credential-value">
-                        <input type="password" value="${decryptedPass}" readonly id="pwd-${item.id}">
-                        <button class="btn btn-secondary" onclick="toggleVis('${item.id}')">👁️</button>
-                        <button class="btn btn-secondary" onclick="copyText('${decryptedPass}')">Copy</button>
-                    </div>
-
-                    ${item.notes ? `<p style="font-size:13px; color:#666; margin-bottom:10px;">📝 ${item.notes}</p>` : ''}
-
-                    <div style="margin-top:10px; display:flex; gap:5px;">
-                        <button class="btn btn-primary" onclick="editCredential('${item.id}')" style="flex:1;">แก้ไข</button>
-                        <button class="btn btn-danger" onclick="deleteCredential('${item.id}')">ลบ</button>
-                    </div>
-                </div>
-            `}).join('');
-        };
-
-        // UI Helpers
-        window.filterCategory = (cat) => {
-            currentCategory = cat;
-            document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-            event.target.classList.add('active');
-            renderCredentials();
-        };
-
-        window.openModal = () => {
-            document.getElementById('dataForm').reset();
-            document.getElementById('docId').value = "";
-            document.getElementById('dataModal').classList.remove('hidden');
-        };
-        window.closeModal = () => document.getElementById('dataModal').classList.add('hidden');
-        window.openBranchModal = () => document.getElementById('branchModal').classList.remove('hidden');
-        
-        window.toggleVis = (id) => {
-            const el = document.getElementById(`pwd-${id}`);
-            el.type = el.type === 'password' ? 'text' : 'password';
-        };
-
-        window.copyText = (text) => {
-            navigator.clipboard.writeText(text);
-            alert("Copied!");
-        };
-
-        window.genPass = () => {
-            const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*";
-            let pass = "";
-            for(let i=0; i<16; i++) pass += chars.charAt(Math.floor(Math.random() * chars.length));
-            document.getElementById('inpPassword').value = pass;
-        };
-
-        // Search Listener
-        document.getElementById('searchInput').addEventListener('input', renderCredentials);
-
-    </script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
-</body>
-</html>
+                    ${item.url ? `<div class="credential-value"><input value="${item.url}" readonly> <button class="btn btn-secondary" onclick="window.open('${item.url}')">🔗</
