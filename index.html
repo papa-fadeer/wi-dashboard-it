@@ -1,1 +1,393 @@
+<!DOCTYPE html>
+<html lang="th">
 
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IT Password Manager (Cloud)</title>
+    <link href="https://fonts.googleapis.com/css2?family=Bai+Jamjuree:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* (ใช้ Style เดิมของคุณได้เลยครับ ผมย่อส่วนนี้เพื่อเน้น Logic นะครับ) */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root { --primary: #2563eb; --bg: #f8fafc; --card: #ffffff; --text: #1e293b; --danger: #ef4444; --success: #10b981; }
+        body { font-family: 'Bai Jamjuree', sans-serif; background: var(--bg); color: var(--text); padding-bottom: 50px; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        
+        /* Login Screen */
+        .login-screen { display: flex; align-items: center; justify-content: center; min-height: 100vh; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); position: fixed; top: 0; left: 0; width: 100%; z-index: 1000; }
+        .login-card { background: white; padding: 40px; border-radius: 16px; width: 100%; max-width: 400px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
+        
+        /* UI Components */
+        .btn { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-family: inherit; font-weight: 500; transition: 0.2s; }
+        .btn:hover { opacity: 0.9; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-secondary { background: #e2e8f0; color: var(--text); }
+        .hidden { display: none !important; }
+        
+        input, select, textarea { width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #cbd5e1; border-radius: 6px; }
+        
+        .credential-card { background: var(--card); padding: 20px; border-radius: 12px; margin-bottom: 15px; border: 1px solid #e2e8f0; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .credential-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+        .credential-value { display: flex; gap: 5px; margin-bottom: 8px; }
+        
+        /* Header & Tabs */
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        .filters { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
+        .filter-btn { padding: 6px 12px; border: 1px solid #cbd5e1; border-radius: 20px; background: white; cursor: pointer; }
+        .filter-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+
+        /* Modal */
+        .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 900; }
+        .modal-content { background: white; padding: 30px; border-radius: 12px; width: 90%; max-width: 500px; max-height: 90vh; overflow-y: auto; }
+        
+        .loading { text-align: center; padding: 20px; color: #64748b; }
+    </style>
+</head>
+
+<body>
+
+    <!-- 1. Login Screen (Email/Pass for Firebase) -->
+    <div id="loginScreen" class="login-screen">
+        <div class="login-card">
+            <h2 style="text-align: center; color: var(--primary); margin-bottom: 20px;">🔐 IT Vault (Cloud)</h2>
+            <form id="loginForm">
+                <label>Email</label>
+                <input type="email" id="email" placeholder="it@company.com" required>
+                <label>Master Password</label>
+                <input type="password" id="password" placeholder="********" required>
+                <button type="submit" class="btn btn-primary" style="width: 100%;">เข้าสู่ระบบ / ลงทะเบียน</button>
+                <p style="margin-top: 15px; font-size: 12px; color: #666; text-align: center;">
+                    * หากยังไม่มีบัญชี ระบบจะสร้างให้โดยอัตโนมัติเมื่อกดเข้าสู่ระบบ
+                </p>
+            </form>
+        </div>
+    </div>
+
+    <!-- 2. Main App -->
+    <div id="mainApp" class="container hidden">
+        <div class="header">
+            <div>
+                <h1>🔐 IT Password Manager</h1>
+                <p id="userDisplay" style="font-size: 14px; color: #64748b;">Loading user...</p>
+            </div>
+            <button class="btn btn-danger" onclick="logout()">ออกจากระบบ</button>
+        </div>
+
+        <!-- Toolbar -->
+        <div class="filters">
+            <input type="text" id="searchInput" placeholder="🔍 ค้นหา..." style="max-width: 250px; margin-bottom: 0;">
+            <select id="branchFilter" style="max-width: 200px; margin-bottom: 0;" onchange="renderCredentials()">
+                <option value="all">🏢 ทุกสาขา</option>
+            </select>
+            <button class="btn btn-primary" onclick="openModal()">➕ เพิ่มข้อมูล</button>
+            <button class="btn btn-secondary" onclick="openBranchModal()">⚙️ จัดการสาขา</button>
+        </div>
+
+        <!-- Category Tabs -->
+        <div class="filters" id="categoryTabs">
+            <button class="filter-btn active" onclick="filterCategory('all')">All</button>
+            <button class="filter-btn" onclick="filterCategory('google-workspace')">Google</button>
+            <button class="filter-btn" onclick="filterCategory('website')">Website</button>
+            <button class="filter-btn" onclick="filterCategory('server')">Server</button>
+            <button class="filter-btn" onclick="filterCategory('network')">Network</button>
+            <button class="filter-btn" onclick="filterCategory('cctv')">CCTV</button>
+            <button class="filter-btn" onclick="filterCategory('etc')">Etc</button>
+        </div>
+
+        <!-- Content -->
+        <div id="loading" class="loading hidden">กำลังโหลดข้อมูลจาก Cloud...</div>
+        <div id="credentialsGrid"></div>
+    </div>
+
+    <!-- 3. Add/Edit Modal -->
+    <div id="dataModal" class="hidden modal">
+        <div class="modal-content">
+            <h2 style="margin-bottom: 20px;">📝 บันทึกข้อมูล</h2>
+            <form id="dataForm">
+                <input type="hidden" id="docId">
+                
+                <select id="inpBranch" required>
+                    <option value="">-- เลือกสาขา --</option>
+                </select>
+                
+                <select id="inpCategory" required>
+                    <option value="google-workspace">Google Workspace</option>
+                    <option value="website">Website</option>
+                    <option value="server">Server</option>
+                    <option value="network">Network</option>
+                    <option value="cctv">CCTV</option>
+                    <option value="etc">Other</option>
+                </select>
+
+                <input type="text" id="inpTitle" placeholder="ชื่อระบบ (Title)" required>
+                <input type="text" id="inpUrl" placeholder="URL / IP Address">
+                <input type="text" id="inpUsername" placeholder="Username">
+                <div style="display: flex; gap: 5px;">
+                    <input type="text" id="inpPassword" placeholder="Password">
+                    <button type="button" class="btn btn-secondary" onclick="genPass()">🎲</button>
+                </div>
+                <textarea id="inpNotes" placeholder="หมายเหตุ" rows="3" style="width:100%; border:1px solid #cbd5e1; border-radius:6px; padding:10px;"></textarea>
+                <input type="date" id="inpExpiry">
+
+                <div style="display: flex; gap: 10px; margin-top: 15px;">
+                    <button type="submit" class="btn btn-primary" style="flex: 1;">บันทึก</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeModal()">ยกเลิก</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 4. Branch Modal -->
+    <div id="branchModal" class="hidden modal">
+        <div class="modal-content">
+            <h2>🏢 จัดการสาขา</h2>
+            <div style="display: flex; gap: 5px; margin: 15px 0;">
+                <input type="text" id="newBranchName" placeholder="ชื่อสาขาใหม่" style="margin-bottom: 0;">
+                <button class="btn btn-primary" onclick="addBranch()">เพิ่ม</button>
+            </div>
+            <ul id="branchList" style="list-style: none; margin-bottom: 20px;"></ul>
+            <button class="btn btn-secondary" style="width: 100%;" onclick="document.getElementById('branchModal').classList.add('hidden')">ปิด</button>
+        </div>
+    </div>
+
+    <!-- Firebase SDKs -->
+    <script type="module">
+        // -----------------------------------------------------------
+        // ⚙️ CONFIGURATION: แก้ไขค่าตรงนี้ด้วยค่าของคุณเอง
+        // -----------------------------------------------------------
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, where, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSy...",          // <--- ใส่ API Key ของคุณ
+            authDomain: "project-id.firebaseapp.com", // <--- ใส่ Auth Domain
+            projectId: "project-id",      // <--- ใส่ Project ID
+            storageBucket: "project-id.appspot.com",
+            messagingSenderId: "...",
+            appId: "..."
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // Global Variables
+        let currentUser = null;
+        let credentialsData = [];
+        let branchesData = [];
+        let currentCategory = 'all';
+
+        // -----------------------------------------------------------
+        // 🔐 AUTHENTICATION
+        // -----------------------------------------------------------
+        const loginForm = document.getElementById('loginForm');
+        
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                currentUser = user;
+                document.getElementById('loginScreen').classList.add('hidden');
+                document.getElementById('mainApp').classList.remove('hidden');
+                document.getElementById('userDisplay').innerText = `User: ${user.email}`;
+                initData(); // Load data when logged in
+            } else {
+                currentUser = null;
+                document.getElementById('loginScreen').classList.remove('hidden');
+                document.getElementById('mainApp').classList.add('hidden');
+            }
+        });
+
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+
+            try {
+                // Try Login
+                await signInWithEmailAndPassword(auth, email, password);
+            } catch (error) {
+                if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
+                    // If user doesn't exist, try creating one (Optional logic)
+                    if(confirm("ไม่พบบัญชีนี้ ต้องการสร้างบัญชีใหม่หรือไม่?")) {
+                        try {
+                            await createUserWithEmailAndPassword(auth, email, password);
+                            alert("สร้างบัญชีสำเร็จ!");
+                        } catch (createErr) {
+                            alert("Error: " + createErr.message);
+                        }
+                    }
+                } else {
+                    alert("Login Failed: " + error.message);
+                }
+            }
+        });
+
+        window.logout = () => signOut(auth);
+
+        // -----------------------------------------------------------
+        // 💾 FIRESTORE DATA LOGIC
+        // -----------------------------------------------------------
+        
+        // Listen to Realtime Updates
+        function initData() {
+            document.getElementById('loading').classList.remove('hidden');
+            
+            // 1. Listen to Credentials
+            const qCreds = query(collection(db, "credentials"), where("uid", "==", currentUser.uid));
+            onSnapshot(qCreds, (snapshot) => {
+                credentialsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                renderCredentials();
+                document.getElementById('loading').classList.add('hidden');
+            });
+
+            // 2. Listen to Branches
+            const qBranches = query(collection(db, "branches"), where("uid", "==", currentUser.uid));
+            onSnapshot(qBranches, (snapshot) => {
+                branchesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                renderBranchOptions();
+                renderBranchList();
+            });
+        }
+
+        // Encryption Helper (Client Side Security)
+        // ใช้รหัสผ่าน Login ไม่ได้เพราะ Firebase ไม่คืนค่า password ให้
+        // เพื่อความง่าย เราจะใช้ CryptoJS เข้ารหัสโดยใช้ UID เป็น Key (ระดับพื้นฐาน)
+        // **ถ้าต้องการปลอดภัยสูง ต้องให้ User กรอก Key แยกต่างหาก**
+        function encryptData(text) {
+            if (!text) return "";
+            return CryptoJS.AES.encrypt(text, currentUser.uid).toString();
+        }
+
+        function decryptData(ciphertext) {
+            if (!ciphertext) return "";
+            try {
+                const bytes = CryptoJS.AES.decrypt(ciphertext, currentUser.uid);
+                return bytes.toString(CryptoJS.enc.Utf8);
+            } catch (e) { return "***Error***"; }
+        }
+
+        // Add/Edit Data
+        const dataForm = document.getElementById('dataForm');
+        dataForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const docId = document.getElementById('docId').value;
+            const rawPassword = document.getElementById('inpPassword').value;
+            
+            const payload = {
+                uid: currentUser.uid,
+                branch: document.getElementById('inpBranch').value,
+                category: document.getElementById('inpCategory').value,
+                title: document.getElementById('inpTitle').value,
+                url: document.getElementById('inpUrl').value,
+                username: document.getElementById('inpUsername').value,
+                password: encryptData(rawPassword), // Encrypt before sending
+                notes: document.getElementById('inpNotes').value,
+                expiryDate: document.getElementById('inpExpiry').value,
+                updatedAt: serverTimestamp()
+            };
+
+            try {
+                if (docId) {
+                    await updateDoc(doc(db, "credentials", docId), payload);
+                } else {
+                    await addDoc(collection(db, "credentials"), payload);
+                }
+                closeModal();
+            } catch (err) {
+                alert("Error saving: " + err.message);
+            }
+        });
+
+        // Delete Data
+        window.deleteCredential = async (id) => {
+            if(confirm("ยืนยันการลบ?")) {
+                await deleteDoc(doc(db, "credentials", id));
+            }
+        };
+
+        // Edit Trigger
+        window.editCredential = (id) => {
+            const item = credentialsData.find(c => c.id === id);
+            if (!item) return;
+
+            document.getElementById('docId').value = id;
+            document.getElementById('inpBranch').value = item.branch || "";
+            document.getElementById('inpCategory').value = item.category;
+            document.getElementById('inpTitle').value = item.title;
+            document.getElementById('inpUrl').value = item.url;
+            document.getElementById('inpUsername').value = item.username;
+            document.getElementById('inpPassword').value = decryptData(item.password);
+            document.getElementById('inpNotes').value = item.notes;
+            document.getElementById('inpExpiry').value = item.expiryDate;
+            
+            document.getElementById('dataModal').classList.remove('hidden');
+        };
+
+        // -----------------------------------------------------------
+        // 🏢 BRANCH LOGIC
+        // -----------------------------------------------------------
+        window.addBranch = async () => {
+            const name = document.getElementById('newBranchName').value;
+            if (!name) return;
+            await addDoc(collection(db, "branches"), { uid: currentUser.uid, name: name });
+            document.getElementById('newBranchName').value = "";
+        };
+
+        window.deleteBranch = async (id) => {
+            if(confirm("ลบสาขานี้?")) await deleteDoc(doc(db, "branches", id));
+        };
+
+        function renderBranchOptions() {
+            const select = document.getElementById('inpBranch');
+            const filter = document.getElementById('branchFilter');
+            
+            // Keep default options
+            select.innerHTML = '<option value="">-- เลือกสาขา --</option>';
+            filter.innerHTML = '<option value="all">🏢 ทุกสาขา</option>';
+
+            branchesData.forEach(b => {
+                select.innerHTML += `<option value="${b.name}">${b.name}</option>`;
+                filter.innerHTML += `<option value="${b.name}">${b.name}</option>`;
+            });
+        }
+
+        function renderBranchList() {
+            const list = document.getElementById('branchList');
+            list.innerHTML = branchesData.map(b => `
+                <li style="display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid #eee;">
+                    ${b.name} <button class="btn btn-danger" style="padding:2px 8px; font-size:12px;" onclick="deleteBranch('${b.id}')">ลบ</button>
+                </li>
+            `).join('');
+        }
+
+        // -----------------------------------------------------------
+        // 🎨 UI RENDERING & UTILS
+        // -----------------------------------------------------------
+        window.renderCredentials = () => {
+            const grid = document.getElementById('credentialsGrid');
+            const search = document.getElementById('searchInput').value.toLowerCase();
+            const branchFilter = document.getElementById('branchFilter').value;
+
+            const filtered = credentialsData.filter(item => {
+                const matchesSearch = item.title.toLowerCase().includes(search) || (item.username && item.username.toLowerCase().includes(search));
+                const matchesCategory = currentCategory === 'all' || item.category === currentCategory;
+                const matchesBranch = branchFilter === 'all' || item.branch === branchFilter;
+                return matchesSearch && matchesCategory && matchesBranch;
+            });
+
+            grid.innerHTML = filtered.map(item => {
+                const decryptedPass = decryptData(item.password);
+                return `
+                <div class="credential-card">
+                    <div class="credential-header">
+                        <div>
+                            <h3 style="color:var(--primary)">${item.title}</h3>
+                            <small style="color:#64748b">🏢 ${item.branch || '-'}</small>
+                        </div>
+                        <span style="background:#e2e8f0; padding:2px 8px; border-radius:4px; font-size:12px;">${item.category}</span>
+                    </div>
+                    
+                    ${item.url ? `<div class="credential-value"><input value="${item.url}" readonly> <button class="btn btn-secondary" onclick="window.open('${item.url}')">🔗</
